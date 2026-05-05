@@ -1,67 +1,47 @@
-// Package source provides a unified interface for loading environment
-// variables from different origins: .env files or running processes.
+// Package source resolves environment variable maps from various sources:
+// .env files, running process PIDs, the current process, or saved snapshots.
 package source
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
-	"github.com/yourorg/envoy-diff/internal/parser"
-	"github.com/yourorg/envoy-diff/internal/process"
+	"github.com/user/envoy-diff/internal/parser"
+	"github.com/user/envoy-diff/internal/process"
+	"github.com/user/envoy-diff/internal/snapshot"
 )
 
-// Type represents the kind of environment source.
-type Type string
-
-const (
-	// File indicates a .env file source.
-	File Type = "file"
-	// PID indicates a running process source.
-	PID Type = "pid"
-	// Self indicates the current process environment.
-	Self Type = "self"
-)
-
-// Source describes an environment variable origin.
-type Source struct {
-	Kind Type
-	// Path is set when Kind == File.
-	Path string
-	// PID is set when Kind == PID.
-	PID int
-}
-
-// Load reads environment variables from the source and returns them as a
-// map of key → value pairs.
-func Load(s Source) (map[string]string, error) {
-	switch s.Kind {
-	case File:
-		if s.Path == "" {
-			return nil, fmt.Errorf("source: file path must not be empty")
-		}
-		return parser.ParseFile(s.Path)
-	case PID:
-		if s.PID <= 0 {
-			return nil, fmt.Errorf("source: PID must be a positive integer, got %d", s.PID)
-		}
-		return process.ReadPID(s.PID)
-	case Self:
+// Load resolves an environment map from the given source string.
+//
+// Source formats:
+//   - ""         — current process environment
+//   - "self"     — current process environment (explicit)
+//   - "pid:<n>"  — environment of process with PID n
+//   - "snap:<p>" — load a saved snapshot from file path p
+//   - anything else is treated as a .env file path
+func Load(src string) (map[string]string, error) {
+	switch {
+	case src == "" || src == "self":
 		return process.ReadSelf(), nil
-	default:
-		return nil, fmt.Errorf("source: unknown source kind %q", s.Kind)
-	}
-}
 
-// String returns a human-readable label for the source, suitable for diff
-// output headers.
-func (s Source) String() string {
-	switch s.Kind {
-	case File:
-		return fmt.Sprintf("file:%s", s.Path)
-	case PID:
-		return fmt.Sprintf("pid:%d", s.PID)
-	case Self:
-		return "self"
+	case strings.HasPrefix(src, "pid:"):
+		pidStr := strings.TrimPrefix(src, "pid:")
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			return nil, fmt.Errorf("source: invalid pid %q: %w", pidStr, err)
+		}
+		return process.ReadPID(pid)
+
+	case strings.HasPrefix(src, "snap:"):
+		path := strings.TrimPrefix(src, "snap:")
+		snap, err := snapshot.Load(path)
+		if err != nil {
+			return nil, fmt.Errorf("source: load snapshot: %w", err)
+		}
+		return snap.Env, nil
+
 	default:
-		return fmt.Sprintf("unknown(%s)", s.Kind)
+		return parser.ParseFile(src)
 	}
 }
