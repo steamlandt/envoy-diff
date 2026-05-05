@@ -4,58 +4,63 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
+
+	"github.com/yourorg/envoy-diff/internal/filter"
 )
 
+// config holds all parsed CLI configuration.
 type config struct {
-	sourceA  string
-	sourceB  string
-	color    bool
-	onlyKeys bool
-	exitCode bool
+	SourceA string
+	SourceB string
+	NoColor bool
+	OnlyChanged bool
+	Filter  filter.Options
 }
 
 func parseFlags(args []string) (*config, error) {
 	fs := flag.NewFlagSet("envoy-diff", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
+	fs.SetOutput(os.Stderr)
+	fs.Usage = usage
 
-	cfg := &config{}
-
-	fs.BoolVar(&cfg.color, "color", isTerminal(), "colorize output")
-	fs.BoolVar(&cfg.onlyKeys, "keys", false, "show only key names, not values")
-	fs.BoolVar(&cfg.exitCode, "exit-code", false, "exit with code 2 if differences found")
+	var cfg config
+	fs.BoolVar(&cfg.NoColor, "no-color", false, "disable coloured output")
+	fs.BoolVar(&cfg.OnlyChanged, "only-changed", false, "show only changed/added/removed keys")
+	fs.StringVar(&cfg.Filter.Prefix, "prefix", "", "only compare keys with this prefix")
+	fs.StringVar(&cfg.Filter.Suffix, "suffix", "", "only compare keys with this suffix")
+	fs.StringVar(&cfg.Filter.Pattern, "pattern", "", "only compare keys matching this regex")
 
 	if err := fs.Parse(args); err != nil {
-		return nil, fmt.Errorf("%w\n%s", err, usage())
+		return nil, err
 	}
 
-	if fs.NArg() != 2 {
-		return nil, errors.New(usage())
+	if fs.NArg() < 2 {
+		return nil, errors.New("two sources required: <a> <b>")
 	}
 
-	cfg.sourceA = fs.Arg(0)
-	cfg.sourceB = fs.Arg(1)
-
-	return cfg, nil
+	cfg.SourceA = fs.Arg(0)
+	cfg.SourceB = fs.Arg(1)
+	return &cfg, nil
 }
 
-func usage() string {
-	return `Usage: envoy-diff [flags] <source-a> <source-b>
+func usage() {
+	fmt.Fprintln(os.Stderr, `Usage: envoy-diff [options] <source-a> <source-b>
 
-Sources can be:
-  path/to/file.env   — a .env file
-  self               — the current process environment
-  pid:<N>            — environment of process with PID N
+Sources:
+  path/to/file.env   read from a .env file
+  self               read from the current process
+  <pid>              read from a running process by PID
 
-Flags:
-  -color        colorize output (default: auto)
-  -keys         show only key names, omit values
-  -exit-code    exit with code 2 when differences are found`
+Options:`)
+	fmt.Fprintln(os.Stderr, "  -no-color       disable coloured output")
+	fmt.Fprintln(os.Stderr, "  -only-changed   show only changed/added/removed keys")
+	fmt.Fprintln(os.Stderr, "  -prefix string  only compare keys with this prefix")
+	fmt.Fprintln(os.Stderr, "  -suffix string  only compare keys with this suffix")
+	fmt.Fprintln(os.Stderr, "  -pattern string only compare keys matching this regex")
 }
 
-func isTerminal() bool {
-	fi, err := os.Stdout.Stat()
+func isTerminal(f *os.File) bool {
+	fi, err := f.Stat()
 	if err != nil {
 		return false
 	}
