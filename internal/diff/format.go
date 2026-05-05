@@ -13,10 +13,10 @@ type FormatOptions struct {
 }
 
 const (
-	colorRed   = "\033[31m"
-	colorGreen = "\033[32m"
+	colorRed    = "\033[31m"
+	colorGreen  = "\033[32m"
 	colorYellow = "\033[33m"
-	colorReset = "\033[0m"
+	colorReset  = "\033[0m"
 )
 
 // Format renders a slice of Entry values as a human-readable diff string.
@@ -79,4 +79,21 @@ func sortedKeys(entries []Entry) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// Summary returns a short human-readable summary of the diff, reporting the
+// count of added, removed, and changed keys.
+func Summary(entries []Entry) string {
+	var added, removed, changed int
+	for _, e := range entries {
+		switch e.Kind {
+		case OnlyInB:
+			added++
+		case OnlyInA:
+			removed++
+		case Changed:
+			changed++
+		}
+	}
+	return fmt.Sprintf("%d added, %d removed, %d changed", added, removed, changed)
 }
