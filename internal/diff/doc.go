@@ -19,4 +19,11 @@
 // [Apply] takes a base environment map and a []Entry and returns a new map
 // that reflects the target ("B") side of the diff, with optional conflict
 // detection and skip-remove semantics.
+//
+// # Filtering
+//
+// [Filter] accepts a []Entry and a predicate function, returning only the
+// entries for which the predicate returns true. This is useful for narrowing
+// results to a specific [Kind] (e.g. only additions or removals) before
+// passing them to [Format], [Patch], or [Apply].
 package diff
