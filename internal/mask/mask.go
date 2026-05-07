@@ -58,3 +58,21 @@ func Map(env map[string]string, opts Options) map[string]string {
 	}
 	return out
 }
+
+// Keys returns a new map with masking applied only to the values whose keys
+// appear in the provided keys slice. All other entries are copied unchanged.
+func Keys(env map[string]string, keys []string, opts Options) map[string]string {
+	mask := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		mask[k] = true
+	}
+	out := make(map[string]string, len(env))
+	for k, v := range env {
+		if mask[k] {
+			out[k] = Value(v, opts)
+		} else {
+			out[k] = v
+		}
+	}
+	return out
+}
