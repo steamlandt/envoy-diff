@@ -1,20 +1,22 @@
-// Package diff provides utilities for comparing two sets of environment
-// variables and formatting the resulting differences for human consumption.
+// Package diff compares two environment variable maps and produces a list of
+// Entry values describing what was added, removed, changed, or left unchanged.
 //
-// Basic usage:
+// # Comparing
 //
-//	a := map[string]string{"FOO": "bar", "OLD": "gone"}
-//	b := map[string]string{"FOO": "changed", "NEW": "here"}
+// Use [Compare] to produce a []Entry from two map[string]string values.
 //
-//	result := diff.Compare(a, b)
-//	diff.Format(os.Stdout, result, ".env.dev", ".env.prod")
+// # Formatting
 //
-// The Result type exposes four categories:
-//   - OnlyInA   – keys present in A but not in B (removed relative to B)
-//   - OnlyInB   – keys present in B but not in A (added relative to A)
-//   - Changed   – keys present in both with differing values
-//   - Unchanged – keys present in both with identical values
+// [Format] renders a []Entry as a human-readable, optionally colourised string.
 //
-// Summary statistics are available via Result.Summary(), which returns counts
-// for each category without requiring manual iteration over the result fields.
+// # Patching
+//
+// [Patch] serialises the changed entries into a unified, shell, or dotenv
+// patch string that can be shared or stored.
+//
+// # Applying
+//
+// [Apply] takes a base environment map and a []Entry and returns a new map
+// that reflects the target ("B") side of the diff, with optional conflict
+// detection and skip-remove semantics.
 package diff
